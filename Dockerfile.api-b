@@ -1,0 +1,12 @@
+FROM golang:1.22 as builder
+WORKDIR /app
+RUN apt-get install -y ca-certificates
+COPY . .
+WORKDIR /app/cmd/api-b
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o microservice-b main.go wire_gen.go && mkdir ../../dist && mv microservice-b .env ../../dist
+
+FROM scratch as runner
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /app/dist/.env .
+COPY --from=builder /app/dist/microservice-b .
+ENTRYPOINT ["./microservice-b"]

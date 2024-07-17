@@ -1,0 +1,7 @@
+services:
+
+  microservice-b:
+    build: ./Dockerfile.api-b
+    ports:
+      - "8080:8080"
+    
