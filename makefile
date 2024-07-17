@@ -2,9 +2,16 @@ WIRECMD=wire
 GOCMD=go
 DOCKERCOMPOSECMD=docker-compose
 
+wire-api-a:
+	@command -v wire >/dev/null 2>&1 || $(GOCMD) install github.com/google/wire/cmd/wire@latest
+	@cd cmd/api-a && $(WIRECMD)
+
 wire-api-b:
 	@command -v wire >/dev/null 2>&1 || $(GOCMD) install github.com/google/wire/cmd/wire@latest
 	@cd cmd/api-b && $(WIRECMD)
+
+run-api-a:
+	cd cmd/api-a/ && $(GOCMD) run main.go wire_gen.go
 
 run-api-b:
 	cd cmd/api-b/ && $(GOCMD) run main.go wire_gen.go
