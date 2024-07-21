@@ -11,6 +11,9 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -31,9 +34,18 @@ type ErrorResponse struct {
 
 var tracer trace.Tracer
 
-func fetchLocation(ctx context.Context, cep string) (string, error) {
+func fetchLocation(ctx context.Context, cep string, requestId string) (string, error) {
+	values := []attribute.KeyValue{
+		attribute.String("RequestId", requestId),
+		attribute.String("CEP", cep),
+	}
+	ctx, span := tracer.Start(ctx, "handler::call::cep-api", trace.WithAttributes(values...))
+	defer span.End()
+
 	url := fmt.Sprintf("https://viacep.com.br/ws/%s/json/", cep)
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
 	client := http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
 	resp, err := client.Do(req)
@@ -54,9 +66,18 @@ func fetchLocation(ctx context.Context, cep string) (string, error) {
 	return result["localidade"].(string), nil
 }
 
-func fetchWeather(ctx context.Context, city string) (float64, error) {
+func fetchWeather(ctx context.Context, city string, requestId string) (float64, error) {
+	values := []attribute.KeyValue{
+		attribute.String("RequestId", requestId),
+		attribute.String("City", city),
+	}
+	ctx, span := tracer.Start(ctx, "handler::call::weather-api", trace.WithAttributes(values...))
+	defer span.End()
+
 	url := fmt.Sprintf("https://api.weatherapi.com/v1/current.json?key=a9526be837464f3b82814230241307&q=%s&aqi=no", url.QueryEscape(city))
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
 	client := http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
 	resp, err := client.Do(req)
@@ -75,7 +96,11 @@ func fetchWeather(ctx context.Context, city string) (float64, error) {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	_, span := tracer.Start(r.Context(), "handler::receives::cep")
+	requestId := r.Header.Get("x-request-id")
+
+	carrier := propagation.HeaderCarrier(r.Header)
+	ctx := r.Context()
+	ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
 
 	var cepRequest CEPRequest
 	if err := json.NewDecoder(r.Body).Decode(&cepRequest); err != nil {
@@ -83,29 +108,26 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	values := []attribute.KeyValue{
+		attribute.String("RequestId", requestId),
+		attribute.String("CEP", cepRequest.CEP),
+	}
+	_, span := tracer.Start(ctx, "handler::receives::cep", trace.WithAttributes(values...))
 	span.End()
 
-	ctx, span := tracer.Start(r.Context(), "handler::call::cep-api")
-
-	city, err := fetchLocation(ctx, cepRequest.CEP)
+	city, err := fetchLocation(ctx, cepRequest.CEP, requestId)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(ErrorResponse{Message: "can not find zipcode"})
 		return
 	}
 
-	span.End()
-
-	ctx, span = tracer.Start(r.Context(), "handler::call::weather-api")
-
-	tempC, err := fetchWeather(ctx, city)
+	tempC, err := fetchWeather(ctx, city, requestId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(ErrorResponse{Message: "failed to get weather"})
 		return
 	}
-
-	span.End()
 
 	tempF := tempC*1.8 + 32
 	tempK := tempC + 273

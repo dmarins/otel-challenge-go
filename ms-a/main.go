@@ -11,6 +11,9 @@ import (
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -30,13 +33,23 @@ func validateCEP(cep string) bool {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	_, span := tracer.Start(r.Context(), "handler::receives::cep")
+	requestId := r.Header.Get("x-request-id")
+
+	carrier := propagation.HeaderCarrier(r.Header)
+	ctx := r.Context()
+	ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
 
 	var cepRequest CEPRequest
 	if err := json.NewDecoder(r.Body).Decode(&cepRequest); err != nil {
 		http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
 		return
 	}
+
+	values := []attribute.KeyValue{
+		attribute.String("RequestId", requestId),
+		attribute.String("CEP", cepRequest.CEP),
+	}
+	_, span := tracer.Start(ctx, "handler::receives::cep", trace.WithAttributes(values...))
 
 	if !validateCEP(cepRequest.CEP) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
@@ -46,7 +59,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	span.End()
 
-	ctx, span := tracer.Start(r.Context(), "handler::post::ms-b")
+	ctx, span = tracer.Start(ctx, "handler::post::ms-b")
 	defer span.End()
 
 	serviceBURL := "http://ms-b:8081/weather"
@@ -57,6 +70,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-request-id", requestId)
+
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 
 	client := http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
 	resp, err := client.Do(req)
