@@ -136,5 +136,5 @@ func main() {
 
 	router.Post("/weather", handler)
 
-	log.Fatal(http.ListenAndServe(":8081", nil))
+	log.Fatal(http.ListenAndServe(":8081", router))
 }
