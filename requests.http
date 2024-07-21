@@ -1,13 +1,29 @@
-### GetWeatherByZipcode - API B
-
-GET http://localhost:8080/weather/20020080
-
-
-### ms-a POST cep
+### ms-a POST valid zipcode
 
 POST http://localhost:8080/cep
 Content-Type: application/json
+x-request-id: {{$guid}}
 
 {
   "cep": "20020080"
+}
+
+### ms-a POST invalid zipcode
+
+POST http://localhost:8080/cep
+Content-Type: application/json
+x-request-id: {{$guid}}
+
+{
+  "cep": "123456"
+}
+
+### ms-a POST inexistent zipcode
+
+POST http://localhost:8080/cep
+Content-Type: application/json
+x-request-id: {{$guid}}
+
+{
+  "cep": "12345678"
 }

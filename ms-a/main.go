@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -87,6 +89,12 @@ func main() {
 
 	tracer = tp.Tracer("github.com/dmarins/otel-challenge-go")
 
-	http.HandleFunc("/cep", handler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	router := chi.NewRouter()
+
+	router.Use(middleware.RequestID)
+	router.Use(middleware.Logger)
+
+	router.Post("/cep", handler)
+
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
