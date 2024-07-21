@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -127,6 +129,12 @@ func main() {
 
 	tracer = tp.Tracer("github.com/dmarins/otel-challenge-go")
 
-	http.HandleFunc("/weather", handler)
+	router := chi.NewRouter()
+
+	router.Use(middleware.RequestID)
+	router.Use(middleware.Logger)
+
+	router.Post("/weather", handler)
+
 	log.Fatal(http.ListenAndServe(":8081", nil))
 }
