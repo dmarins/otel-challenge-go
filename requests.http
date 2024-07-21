@@ -3,7 +3,7 @@
 GET http://localhost:8080/weather/20020080
 
 
-### POST - ms-a
+### ms-a POST cep
 
 POST http://localhost:8080/cep
 Content-Type: application/json

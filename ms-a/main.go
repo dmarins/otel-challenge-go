@@ -28,11 +28,11 @@ func validateCEP(cep string) bool {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	_, span := tracer.Start(r.Context(), "handler:get:cep")
+	_, span := tracer.Start(r.Context(), "handler::receives::cep")
 
 	var cepRequest CEPRequest
 	if err := json.NewDecoder(r.Body).Decode(&cepRequest); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -44,7 +44,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	span.End()
 
-	ctx, span := tracer.Start(r.Context(), "handler:call:ms-b")
+	ctx, span := tracer.Start(r.Context(), "handler::post::ms-b")
 	defer span.End()
 
 	serviceBURL := "http://ms-b:8081/weather"

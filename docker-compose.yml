@@ -5,14 +5,15 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - otel-collector
+      - ms-b
 
-  # ms-b:
-  #   build: ./ms-b
-  #   ports:
-  #     - "8081:8081"
-  #   depends_on:
-  #     - otel-collector
+  ms-b:
+    container_name: ms-b
+    build: ./ms-b
+    ports:
+      - "8081:8081"
+    depends_on:
+      - otel-collector
 
   otel-collector:
     container_name: otel-collector
@@ -25,6 +26,8 @@ services:
       - "4318:4318"
       - "55681:55681"
       - "8888:8888"
+    depends_on:
+      - zipkin
 
   zipkin:
     container_name: zipkin
